@@ -22,30 +22,34 @@ export default function GamePage() {
   const [studentMove, setStudentMove] = useState<Move | null>(null);
   const [agentMove, setAgentMove] = useState<Move | null>(null);
   const [result, setResult] = useState<{ student: number; agent: number } | null>(null);
+  const [strategy, setStrategy] = useState<"ALWAYS_DEFECT" | "ALWAYS_COOPERATE" | "RANDOM_50_50">("ALWAYS_DEFECT");
+
 
   // Load chat transcript from sessionStorage
   useEffect(() => {
     const raw = sessionStorage.getItem("pd_messages");
-    if (!raw) return;
-    try {
-      setMessages(JSON.parse(raw));
-    } catch {
-      // ignore parse errors
+    if (raw) {
+        try {
+        setMessages(JSON.parse(raw));
+        } catch {
+        // ignore parse errors
+        }
     }
-  }, []);
+
+    const s = sessionStorage.getItem("pd_strategy");
+    if (s === "ALWAYS_DEFECT" || s === "ALWAYS_COOPERATE" || s === "RANDOM_50_50") {
+        setStrategy(s);
+    }
+    }, []);
 
   // Simple, transparent rule for Person A's move:
   // If student used trust/cooperate/team language in chat, A cooperates; otherwise A defects.
-  const computedAgentMove: Move = useMemo(() => {
-    const text = messages
-      .filter((m) => m.role === "student")
-      .map((m) => m.text.toLowerCase())
-      .join(" ");
-
-    const cooperativeWords = ["trust", "cooperate", "team", "together", "fair", "mutual", "good faith"];
-    const found = cooperativeWords.some((w) => text.includes(w));
-    return found ? "COOPERATE" : "DEFECT";
-  }, [messages]);
+    const computedAgentMove: Move = useMemo(() => {
+        if (strategy === "ALWAYS_DEFECT") return "DEFECT";
+        if (strategy === "ALWAYS_COOPERATE") return "COOPERATE";
+        // RANDOM_50_50
+        return Math.random() < 0.5 ? "COOPERATE" : "DEFECT";
+    }, [strategy]);
 
   function choose(move: Move) {
     if (studentMove) return; // prevent choosing twice

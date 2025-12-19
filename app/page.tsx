@@ -25,6 +25,8 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState(30);
   const [locked, setLocked] = useState(false);
   const [scriptIndex, setScriptIndex] = useState(0);
+  const [strategy, setStrategy] = useState<"ALWAYS_DEFECT" | "ALWAYS_COOPERATE" | "RANDOM_50_50">("ALWAYS_DEFECT");
+  const [isInstructor, setIsInstructor] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -38,6 +40,18 @@ export default function Home() {
     const t = setTimeout(() => setTimeLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
   }, [timeLeft, locked]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const instructorMode = params.get("instructor") === "1";
+    setIsInstructor(instructorMode);
+
+    // Load saved strategy (if any)
+    const saved = localStorage.getItem("pd_strategy");
+    if (saved === "ALWAYS_DEFECT" || saved === "ALWAYS_COOPERATE" || saved === "RANDOM_50_50") {
+      setStrategy(saved);
+    }
+  }, []);
 
   // auto-scroll
   useEffect(() => {
@@ -62,10 +76,12 @@ export default function Home() {
   }
 
   function onContinue() {
-    // store transcript for next page
+    // store transcript + strategy for next page
     sessionStorage.setItem("pd_messages", JSON.stringify(messages));
+    sessionStorage.setItem("pd_strategy", strategy);
     window.location.href = "/game";
-  }
+}
+
 
   return (
     <main style={{ maxWidth: 720, margin: "30px auto", padding: 16, fontFamily: "system-ui" }}>
@@ -75,6 +91,48 @@ export default function Home() {
           Step <b>1/2</b> · Chat · <b>{timeLeft}s</b>
         </div>
       </div>
+
+      {/* Instructor-only controls */}
+      {isInstructor && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 12,
+            border: "1px dashed #bbb",
+            borderRadius: 12,
+            background: "#fff",
+          }}
+        >
+          <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>
+            Instructor settings (visible only with ?instructor=1)
+          </div>
+
+          <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>
+            Person A strategy:
+          </label>
+
+          <select
+            value={strategy}
+            onChange={(e) => {
+              const v = e.target.value as
+                | "ALWAYS_DEFECT"
+                | "ALWAYS_COOPERATE"
+                | "RANDOM_50_50";
+              setStrategy(v);
+              localStorage.setItem("pd_strategy", v);
+            }}
+            style={{
+              padding: "8px 10px",
+              borderRadius: 10,
+              border: "1px solid #ccc",
+            }}
+          >
+            <option value="ALWAYS_DEFECT">Always defect</option>
+            <option value="ALWAYS_COOPERATE">Always cooperate</option>
+            <option value="RANDOM_50_50">Random (50/50)</option>
+          </select>
+        </div>
+      )}
 
       <p style={{ marginTop: 8, color: "#444" }}>
         You have about 30 seconds. When the timer hits 0, chat stops and you continue to the decision.
@@ -152,7 +210,9 @@ export default function Home() {
       <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between" }}>
         <button
           onClick={() => {
-            setMessages([{ role: "agent", text: "Hi — I’m Person A. Type a quick hello and we’ll start." }]);
+            setMessages([
+              { role: "agent", text: "Hi — I’m Person A. Type a quick hello and we’ll start." },
+            ]);
             setInput("");
             setTimeLeft(30);
             setLocked(false);
@@ -185,5 +245,6 @@ export default function Home() {
       </div>
     </main>
   );
+
 }
 
