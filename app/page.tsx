@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
 
 type Msg = { role: "agent" | "student"; text: string };
+type Strategy = "ALWAYS_DEFECT" | "ALWAYS_COOPERATE" | "RANDOM_50_50";
 
 export default function Home() {
   const script = useMemo(
@@ -25,10 +27,38 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState(30);
   const [locked, setLocked] = useState(false);
   const [scriptIndex, setScriptIndex] = useState(0);
-  const [strategy, setStrategy] = useState<"ALWAYS_DEFECT" | "ALWAYS_COOPERATE" | "RANDOM_50_50">("ALWAYS_DEFECT");
+
+  const [strategy, setStrategy] = useState<Strategy>("ALWAYS_DEFECT");
   const [isInstructor, setIsInstructor] = useState(false);
+  const [classCode, setClassCode] = useState("MBA-A1");
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  // 1) Instructor mode toggle + load saved settings
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const instructorMode = params.get("instructor") === "1";
+    setIsInstructor(instructorMode);
+
+    const savedStrategy = localStorage.getItem("pd_strategy");
+    if (savedStrategy === "ALWAYS_DEFECT" || savedStrategy === "ALWAYS_COOPERATE" || savedStrategy === "RANDOM_50_50") {
+      setStrategy(savedStrategy);
+    }
+
+    const savedClass = localStorage.getItem("pd_class_code");
+    if (savedClass) setClassCode(savedClass);
+  }, []);
+
+  // 2) Ensure anonymous session exists (no student login)
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        const { error } = await supabase.auth.signInAnonymously();
+        if (error) console.error("Anonymous sign-in error:", error.message);
+      }
+    })();
+  }, []);
 
   // countdown
   useEffect(() => {
@@ -40,18 +70,6 @@ export default function Home() {
     const t = setTimeout(() => setTimeLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
   }, [timeLeft, locked]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const instructorMode = params.get("instructor") === "1";
-    setIsInstructor(instructorMode);
-
-    // Load saved strategy (if any)
-    const saved = localStorage.getItem("pd_strategy");
-    if (saved === "ALWAYS_DEFECT" || saved === "ALWAYS_COOPERATE" || saved === "RANDOM_50_50") {
-      setStrategy(saved);
-    }
-  }, []);
 
   // auto-scroll
   useEffect(() => {
@@ -71,17 +89,44 @@ export default function Home() {
     setMessages((m) => [...m, { role: "student", text }]);
     setInput("");
 
-    // reply after a short delay
     setTimeout(() => addAgentLine(), 350);
   }
 
-  function onContinue() {
+  async function onContinue() {
     // store transcript + strategy for next page
     sessionStorage.setItem("pd_messages", JSON.stringify(messages));
     sessionStorage.setItem("pd_strategy", strategy);
-    window.location.href = "/game";
-}
+    sessionStorage.setItem("pd_class_code", classCode);
 
+    // Insert row into Supabase
+    try {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw new Error(userErr.message);
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("No anonymous user id found (auth.uid missing).");
+
+      const { data, error } = await supabase
+        .from("pd_sessions")
+        .insert({
+          user_id: userId,
+          class_code: classCode,
+          strategy,
+          chat: JSON.parse(JSON.stringify(messages)),
+        })
+        .select("id")
+        .single();
+
+      if (error) throw new Error(error.message);
+
+      // Save session id so /game can update the same row
+      sessionStorage.setItem("pd_session_id", data.id);
+    } catch (e: any) {
+      console.error("Supabase insert failed:", e?.message ?? e);
+      // We still allow the game to proceed even if DB insert fails
+    }
+
+    window.location.href = "/game";
+  }
 
   return (
     <main style={{ maxWidth: 720, margin: "30px auto", padding: 16, fontFamily: "system-ui" }}>
@@ -107,30 +152,37 @@ export default function Home() {
             Instructor settings (visible only with ?instructor=1)
           </div>
 
-          <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>
-            Person A strategy:
-          </label>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Person A strategy:</label>
+              <select
+                value={strategy}
+                onChange={(e) => {
+                  const v = e.target.value as Strategy;
+                  setStrategy(v);
+                  localStorage.setItem("pd_strategy", v);
+                }}
+                style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ccc" }}
+              >
+                <option value="ALWAYS_DEFECT">Always defect</option>
+                <option value="ALWAYS_COOPERATE">Always cooperate</option>
+                <option value="RANDOM_50_50">Random (50/50)</option>
+              </select>
+            </div>
 
-          <select
-            value={strategy}
-            onChange={(e) => {
-              const v = e.target.value as
-                | "ALWAYS_DEFECT"
-                | "ALWAYS_COOPERATE"
-                | "RANDOM_50_50";
-              setStrategy(v);
-              localStorage.setItem("pd_strategy", v);
-            }}
-            style={{
-              padding: "8px 10px",
-              borderRadius: 10,
-              border: "1px solid #ccc",
-            }}
-          >
-            <option value="ALWAYS_DEFECT">Always defect</option>
-            <option value="ALWAYS_COOPERATE">Always cooperate</option>
-            <option value="RANDOM_50_50">Random (50/50)</option>
-          </select>
+            <div>
+              <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Class code:</label>
+              <input
+                value={classCode}
+                onChange={(e) => {
+                  setClassCode(e.target.value);
+                  localStorage.setItem("pd_class_code", e.target.value);
+                }}
+                placeholder="MBA-A1"
+                style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ccc" }}
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -210,9 +262,7 @@ export default function Home() {
       <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between" }}>
         <button
           onClick={() => {
-            setMessages([
-              { role: "agent", text: "Hi — I’m Person A. Type a quick hello and we’ll start." },
-            ]);
+            setMessages([{ role: "agent", text: "Hi — I’m Person A. Type a quick hello and we’ll start." }]);
             setInput("");
             setTimeLeft(30);
             setLocked(false);
@@ -245,6 +295,4 @@ export default function Home() {
       </div>
     </main>
   );
-
 }
-
