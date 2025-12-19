@@ -54,10 +54,13 @@ const escape = (v: any) => {
 };
 
 
-  const csv = [
-    headers.join(","),
-    ...rows.map((r: any) => headers.map((h) => escape(r[h])).join(",")),
-  ].join("\n");
+    const csv =
+    "\uFEFF" +
+    [
+        headers.join(","),
+        ...rows.map((r: any) => headers.map((h) => escape(r[h])).join(",")),
+    ].join("\n");
+
 
   return new NextResponse(csv, {
     headers: {
