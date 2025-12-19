@@ -39,11 +39,20 @@ export async function GET(req: Request) {
     "agent_payoff",
   ];
 
-  const escape = (v: any) => {
-    const s = v === null || v === undefined ? "" : String(v);
-    const needs = /[",\n]/.test(s);
-    return needs ? `"${s.replace(/"/g, '""')}"` : s;
-  };
+const escape = (v: any) => {
+  // If it's an object/array (like chat jsonb), export as JSON text
+  const raw =
+    v === null || v === undefined
+      ? ""
+      : typeof v === "object"
+      ? JSON.stringify(v)
+      : String(v);
+
+  // CSV escaping
+  const needs = /[",\n]/.test(raw);
+  return needs ? `"${raw.replace(/"/g, '""')}"` : raw;
+};
+
 
   const csv = [
     headers.join(","),
