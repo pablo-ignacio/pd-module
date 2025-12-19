@@ -32,6 +32,7 @@ export async function GET(req: Request) {
     "user_id",
     "class_code",
     "strategy",
+    "chat",
     "student_move",
     "agent_move",
     "student_payoff",

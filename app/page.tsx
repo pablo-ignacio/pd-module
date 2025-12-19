@@ -93,40 +93,51 @@ export default function Home() {
   }
 
   async function onContinue() {
-    // store transcript + strategy for next page
-    sessionStorage.setItem("pd_messages", JSON.stringify(messages));
-    sessionStorage.setItem("pd_strategy", strategy);
-    sessionStorage.setItem("pd_class_code", classCode);
+  // store transcript + strategy for next page
+  sessionStorage.setItem("pd_messages", JSON.stringify(messages));
+  sessionStorage.setItem("pd_strategy", strategy);
+  sessionStorage.setItem("pd_class_code", classCode);
 
-    // Insert row into Supabase
-    try {
-      const { data: userData, error: userErr } = await supabase.auth.getUser();
-      if (userErr) throw new Error(userErr.message);
-      const userId = userData.user?.id;
-      if (!userId) throw new Error("No anonymous user id found (auth.uid missing).");
+  // Convert messages to plain JSON (guaranteed JSONB-safe)
+  const chatPayload = messages.map((m) => ({
+    role: m.role,
+    text: m.text,
+  }));
 
-      const { data, error } = await supabase
-        .from("pd_sessions")
-        .insert({
-          user_id: userId,
-          class_code: classCode,
-          strategy,
-          chat: JSON.parse(JSON.stringify(messages)),
-        })
-        .select("id")
-        .single();
+  try {
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr) throw new Error(userErr.message);
 
-      if (error) throw new Error(error.message);
+    const userId = userData.user?.id;
+    if (!userId) throw new Error("No anonymous user id found. Please refresh and try again.");
 
-      // Save session id so /game can update the same row
+    const { data, error } = await supabase
+      .from("pd_sessions")
+      .insert({
+        user_id: userId,
+        class_code: classCode,
+        strategy,
+        chat: chatPayload,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    // TS fix: data can be null, so guard it
+    if (data?.id) {
       sessionStorage.setItem("pd_session_id", data.id);
-    } catch (e: any) {
-      console.error("Supabase insert failed:", e?.message ?? e);
-      // We still allow the game to proceed even if DB insert fails
+    } else {
+      throw new Error("Insert succeeded but no id returned.");
     }
-
-    window.location.href = "/game";
+  } catch (e: any) {
+    console.error("Supabase insert failed:", e?.message ?? e);
+    alert("Chat save failed: " + (e?.message ?? "Unknown error"));
+    // We still continue to the game so class isn't blocked
   }
+
+  window.location.href = "/game";
+}
 
   return (
     <main style={{ maxWidth: 720, margin: "30px auto", padding: 16, fontFamily: "system-ui" }}>
