@@ -1,40 +1,84 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 
 type Msg = { role: "agent" | "student"; text: string };
 type Strategy = "ALWAYS_DEFECT" | "ALWAYS_COOPERATE" | "RANDOM_50_50";
 
 export default function Home() {
-  const script = useMemo(
-    () => [
-      "Hi — I’m Person A. In a moment we’ll play a Prisoner’s Dilemma.",
-      "In this game, you and I each choose: Cooperate or Defect. We choose at the same time.",
-      "If we both cooperate, we both do pretty well. If one defects while the other cooperates, the defector does best and the cooperator does worst.",
-      "If we both defect, we both do worse than mutual cooperation.",
-      "There’s no talking during the choice — this chat is just a short warm-up.",
-      "In the next screen, you’ll pick your move. Ready?",
-    ],
-    []
-  );
-
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: "agent", text: "Hi — I’m Person A. Type a quick hello and we’ll start." },
-  ]);
-
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(40);
   const [locked, setLocked] = useState(false);
-  const [scriptIndex, setScriptIndex] = useState(0);
 
-  const [strategy, setStrategy] = useState<Strategy>("ALWAYS_DEFECT");
   const [isInstructor, setIsInstructor] = useState(false);
+  const [strategy, setStrategy] = useState<Strategy>("ALWAYS_DEFECT");
   const [classCode, setClassCode] = useState("MBA-A1");
 
+  const [authReady, setAuthReady] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  // 1) Instructor mode toggle + load saved settings
+  const [isTyping, setIsTyping] = useState(false);
+  const [round, setRound] = useState<number>(1);
+  const [participantLabel, setParticipantLabel] = useState<string>("");
+  const [gameId, setGameId] = useState<string>("");
+
+  useEffect(() => {
+    // Require participant id; if missing, send to /identify
+    const label = sessionStorage.getItem("pd_participant_label");
+    if (!label) {
+      window.location.href = "/identify";
+      return;
+    }
+    setParticipantLabel(label);
+
+    // Tie the 10 rounds together
+    const gid = sessionStorage.getItem("pd_game_id") || "";
+    setGameId(gid);
+
+    // Round number (Default B: chat continues across rounds)
+    const r = Number(sessionStorage.getItem("pd_round") || "1");
+    setRound(Number.isFinite(r) ? r : 1);
+  }, []);
+
+
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Optional: agent may start the chat (sometimes)
+  useEffect(() => {
+    // Only on first load, only if chat is empty
+    if (messagesRef.current.length > 0) return;
+
+    const willStart = Math.random() < 0.3; // 30% chance
+    if (!willStart) return;
+
+    const delayMs = 500 + Math.random() * 1500; // 0.5–2s delay
+
+    const timer = setTimeout(async () => {
+      try {
+        const reply = await getAgentReply([]); // empty chat context
+        if (reply && reply.trim()) {
+          setMessages([{ role: "agent", text: reply }]);
+        }
+      } catch {
+        // ignore errors silently
+      }
+    }, delayMs);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Keep latest messages (avoids stale state bugs)
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // Instructor mode + local saved settings
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const instructorMode = params.get("instructor") === "1";
@@ -44,12 +88,11 @@ export default function Home() {
     if (savedStrategy === "ALWAYS_DEFECT" || savedStrategy === "ALWAYS_COOPERATE" || savedStrategy === "RANDOM_50_50") {
       setStrategy(savedStrategy);
     }
-
     const savedClass = localStorage.getItem("pd_class_code");
     if (savedClass) setClassCode(savedClass);
   }, []);
 
-  // 2) Ensure anonymous session exists (no student login)
+  // Ensure anonymous auth session exists
   useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getSession();
@@ -57,10 +100,11 @@ export default function Home() {
         const { error } = await supabase.auth.signInAnonymously();
         if (error) console.error("Anonymous sign-in error:", error.message);
       }
+      setAuthReady(true);
     })();
   }, []);
 
-  // countdown
+  // 30-second timer
   useEffect(() => {
     if (locked) return;
     if (timeLeft <= 0) {
@@ -71,73 +115,94 @@ export default function Home() {
     return () => clearTimeout(t);
   }, [timeLeft, locked]);
 
-  // auto-scroll
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  async function getAgentReply(updatedMessages: Msg[]) {
+    const res = await fetch("/api/agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: updatedMessages, strategy }),
+    });
 
-  function addAgentLine() {
-    const next = script[scriptIndex] ?? "Time’s up — click Continue.";
-    setMessages((m) => [...m, { role: "agent", text: next }]);
-    setScriptIndex((i) => Math.min(i + 1, script.length));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || "Agent error");
+    return (data.text ?? "") as string;
   }
 
-  function onSend() {
+  async function onSend() {
     const text = input.trim();
     if (!text || locked) return;
 
-    setMessages((m) => [...m, { role: "student", text }]);
+    const updated: Msg[] = [...messagesRef.current, { role: "student", text }];
+    setMessages(updated);
     setInput("");
+    setIsTyping(true);
+    try {
+      
 
-    setTimeout(() => addAgentLine(), 350);
+      const delayMs = 400 + Math.floor(Math.random() * 1800); // 400–2200ms
+      await new Promise((r) => setTimeout(r, delayMs));
+
+      const reply = await getAgentReply(updated);
+      if (reply && reply.trim()) {
+        setMessages((prev) => [...prev, { role: "agent", text: reply }]);
+      }
+    } 
+    
+    catch (e: any) {
+      console.error(e?.message ?? e);
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "agent", text: "Agent error. Open DevTools (right-click → Inspect) → Network → /api/agent → Response to see why." },
+      ]);
+    
+    } finally {
+        setIsTyping(false);
+    }
   }
 
   async function onContinue() {
-  // store transcript + strategy for next page
-  sessionStorage.setItem("pd_messages", JSON.stringify(messages));
-  sessionStorage.setItem("pd_strategy", strategy);
-  sessionStorage.setItem("pd_class_code", classCode);
+    // Save for /game
+    sessionStorage.setItem("pd_messages", JSON.stringify(messagesRef.current));
+    sessionStorage.setItem("pd_strategy", strategy);
+    sessionStorage.setItem("pd_class_code", classCode);
 
-  // Convert messages to plain JSON (guaranteed JSONB-safe)
-  const chatPayload = messages.map((m) => ({
-    role: m.role,
-    text: m.text,
-  }));
+    // store transcript in DB
+    const chatPayload = messagesRef.current.map((m) => ({ role: m.role, text: m.text }));
 
-  try {
-    const { data: userData, error: userErr } = await supabase.auth.getUser();
-    if (userErr) throw new Error(userErr.message);
+    try {
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) throw new Error(userErr.message);
 
-    const userId = userData.user?.id;
-    if (!userId) throw new Error("No anonymous user id found. Please refresh and try again.");
+      const userId = userData.user?.id;
+      if (!userId) throw new Error("No user id found. Refresh and try again.");
 
-    const { data, error } = await supabase
-      .from("pd_sessions")
-      .insert({
-        user_id: userId,
-        class_code: classCode,
-        strategy,
-        chat: chatPayload,
-      })
-      .select("id")
-      .single();
+      const { data, error } = await supabase
+        .from("pd_sessions")
+        .insert({
+          user_id: userId,
+          class_code: classCode,
+          strategy,
+          chat: chatPayload,
+          participant_label: participantLabel,
+          round_num: round,
+          game_id: gameId,
+        })
+        .select("id")
+        .single();
 
-    if (error) throw new Error(error.message);
+      if (error) throw new Error(error.message);
+      if (!data?.id) throw new Error("Insert succeeded but no id returned.");
 
-    // TS fix: data can be null, so guard it
-    if (data?.id) {
       sessionStorage.setItem("pd_session_id", data.id);
-    } else {
-      throw new Error("Insert succeeded but no id returned.");
+    } catch (e: any) {
+      console.error("Supabase insert failed:", e?.message ?? e);
+      alert("Chat save failed: " + (e?.message ?? "unknown error"));
+      // allow continuing anyway
     }
-  } catch (e: any) {
-    console.error("Supabase insert failed:", e?.message ?? e);
-    alert("Chat save failed: " + (e?.message ?? "Unknown error"));
-    // We still continue to the game so class isn't blocked
-  }
 
-  window.location.href = "/game";
-}
+    window.location.href = `/game?round=${round}`;
+
+  }
 
   return (
     <main style={{ maxWidth: 720, margin: "30px auto", padding: 16, fontFamily: "system-ui" }}>
@@ -148,17 +213,8 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Instructor-only controls */}
       {isInstructor && (
-        <div
-          style={{
-            marginTop: 10,
-            padding: 12,
-            border: "1px dashed #bbb",
-            borderRadius: 12,
-            background: "#fff",
-          }}
-        >
+        <div style={{ marginTop: 10, padding: 12, border: "1px dashed #bbb", borderRadius: 12 }}>
           <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>
             Instructor settings (visible only with ?instructor=1)
           </div>
@@ -189,17 +245,12 @@ export default function Home() {
                   setClassCode(e.target.value);
                   localStorage.setItem("pd_class_code", e.target.value);
                 }}
-                placeholder="MBA-A1"
                 style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ccc" }}
               />
             </div>
           </div>
         </div>
       )}
-
-      <p style={{ marginTop: 8, color: "#444" }}>
-        You have about 30 seconds. When the timer hits 0, chat stops and you continue to the decision.
-      </p>
 
       <div
         style={{
@@ -209,62 +260,52 @@ export default function Home() {
           height: 340,
           overflowY: "auto",
           background: "#fafafa",
+          marginTop: 12,
         }}
       >
         {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            style={{
-              marginBottom: 10,
-              display: "flex",
-              justifyContent: msg.role === "student" ? "flex-end" : "flex-start",
-            }}
-          >
-            <div
-              style={{
-                maxWidth: "80%",
-                padding: "10px 12px",
-                borderRadius: 12,
-                background: msg.role === "student" ? "#e8f0fe" : "white",
-                border: "1px solid #e2e2e2",
-              }}
-            >
-              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-                {msg.role === "student" ? "You" : "Person A"}
-              </div>
+          <div key={idx} style={{ marginBottom: 10, display: "flex", justifyContent: msg.role === "student" ? "flex-end" : "flex-start" }}>
+            <div style={{ maxWidth: "80%", padding: "10px 12px", borderRadius: 12, background: msg.role === "student" ? "#e8f0fe" : "white", border: "1px solid #e2e2e2" }}>
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>{msg.role === "student" ? "You" : "Person A"}</div>
               <div>{msg.text}</div>
             </div>
           </div>
         ))}
+            {isTyping && (
+            <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 6 }}>
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 14,
+                  border: "1px solid #ddd",
+                  background: "#fafafa",
+                  fontSize: 14,
+                }}
+              >
+                <span className="dots">...</span>
+              </div>
+            </div>
+          )}
+
         <div ref={bottomRef} />
       </div>
+
+      
+
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onSend();
-          }}
+          onKeyDown={(e) => e.key === "Enter" && onSend()}
           disabled={locked}
           placeholder={locked ? "Chat closed" : "Type here…"}
-          style={{
-            flex: 1,
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid #ccc",
-          }}
+          style={{ flex: 1, padding: "10px 12px", borderRadius: 10, border: "1px solid #ccc" }}
         />
         <button
           onClick={onSend}
           disabled={locked}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1px solid #ccc",
-            background: locked ? "#f0f0f0" : "white",
-            cursor: locked ? "not-allowed" : "pointer",
-          }}
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #ccc", background: "white" }}
         >
           Send
         </button>
@@ -273,33 +314,20 @@ export default function Home() {
       <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between" }}>
         <button
           onClick={() => {
-            setMessages([{ role: "agent", text: "Hi — I’m Person A. Type a quick hello and we’ll start." }]);
+            setMessages([]);
             setInput("");
             setTimeLeft(30);
             setLocked(false);
-            setScriptIndex(0);
           }}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid #ccc",
-            background: "white",
-            cursor: "pointer",
-          }}
+          style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #ccc", background: "white" }}
         >
           Reset
         </button>
 
         <button
           onClick={onContinue}
-          disabled={!locked}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid #ccc",
-            background: !locked ? "#f0f0f0" : "white",
-            cursor: !locked ? "not-allowed" : "pointer",
-          }}
+          disabled={!locked || !authReady}
+          style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #ccc", background: "white" }}
         >
           Continue to Decision →
         </button>
