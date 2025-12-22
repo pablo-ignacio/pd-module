@@ -21,7 +21,9 @@ export default function IdentifyPage() {
     sessionStorage.setItem("pd_round", "1");
     sessionStorage.removeItem("pd_messages");
 
-    window.location.href = "/";
+    sessionStorage.setItem("pd_participant_label", label.trim());
+    window.location.href = "/instructions";
+
   }
 
   return (

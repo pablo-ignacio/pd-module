@@ -249,7 +249,7 @@ return (
 
         if (next <= 10) {
           sessionStorage.setItem("pd_round", String(next));
-          window.location.href = "/";
+          window.location.href = "/chat";
         } else {
           window.location.href = "/done";
         }

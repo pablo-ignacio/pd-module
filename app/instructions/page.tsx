@@ -20,7 +20,7 @@ export default function InstructionsPage() {
     </p>
 
       <button
-        onClick={() => (window.location.href = "/identify")}
+        onClick={() => (window.location.href = "/chat")}
         style={{ marginTop: 16, padding: "10px 14px", borderRadius: 10, border: "1px solid #ccc", background: "white" }}
       >
         Next →
