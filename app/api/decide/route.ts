@@ -3,12 +3,18 @@ export const runtime = "nodejs";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 type Msg = { role: "agent" | "student"; text: string };
 
 export async function POST(req: Request) {
   try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "Server missing OPENAI_API_KEY. Set it in Vercel -> Settings -> Environmental Variables" }, { status: 500 });
+    }
+    
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
     const { messages } = (await req.json()) as { messages: Msg[] };
 
     if (!Array.isArray(messages)) {
