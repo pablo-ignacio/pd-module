@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+export const runtime = "nodejs";
 
 type IncomingMsg = { role: "agent" | "student"; text: string };
 
@@ -24,6 +24,13 @@ function isAgreement(msg: string) {
 
 export async function POST(req: Request) {
   try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "Server missing OPENAI_API_KEY. Set it in Vercel -> Settings -> Environmental Variables" }, { status: 500 });
+    }
+    
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
     const body = await req.json();
     const shortMode = Math.random() < 0.4; // 40%
     const messages = body?.messages;
