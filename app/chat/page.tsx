@@ -9,7 +9,7 @@ type Strategy = "ALWAYS_DEFECT" | "ALWAYS_COOPERATE" | "RANDOM_50_50";
 export default function Home() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [timeLeft, setTimeLeft] = useState(40);
+  const [timeLeft, setTimeLeft] = useState(30);
   const [locked, setLocked] = useState(false);
 
   const [isInstructor, setIsInstructor] = useState(false);
