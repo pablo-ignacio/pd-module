@@ -23,7 +23,7 @@ function unauthorizedBasic() {
 export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
-  // 1) Instructor-only dashboard (Basic Auth)
+  // ✅ Instructor-only dashboard: Basic Auth
   if (path.startsWith("/dashboard") || path.startsWith("/api/dashboard")) {
     const auth = req.headers.get("authorization");
     const user = process.env.DASH_USER || "instructor";
@@ -34,15 +34,17 @@ export function middleware(req: NextRequest) {
 
     const b64 = auth.slice("Basic ".length);
     const [u, p] = Buffer.from(b64, "base64").toString().split(":");
+
     if (u === user && p === pass) return NextResponse.next();
     return unauthorizedBasic();
   }
 
-  // 2) Student flow requires class cookie (except /identify and /api/class-auth)
+  // ✅ Student flow: allow identify + class-auth without cookie
   if (path === "/identify" || path.startsWith("/api/class-auth")) {
     return NextResponse.next();
   }
 
+  // ✅ Student flow: require class cookie
   const ok = req.cookies.get("pd_class_ok")?.value;
   if (ok !== "1") {
     const url = req.nextUrl.clone();
