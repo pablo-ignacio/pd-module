@@ -290,13 +290,8 @@ async function refresh() {
             />
             Only completed (10 rounds)
             </label>
-            <button
-            onClick={() => (window.location.href = "/dashboard/logout")}
-            style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #ccc", background: "white", cursor: "pointer" }}
-            >
-            Log out
-            </button>
-
+           
+           
 
           <button
             onClick={refresh}
