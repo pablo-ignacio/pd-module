@@ -290,7 +290,25 @@ async function refresh() {
             />
             Only completed (10 rounds)
             </label>
-           
+
+            <button
+            onClick={async () => {
+                await fetch("/api/dashboard-auth", { method: "DELETE" });
+                window.location.href = "/dashboard/login";
+            }}
+            style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #ccc",
+                background: "white",
+                cursor: "pointer",
+                height: 40,
+                marginBottom: 2,
+            }}
+            >
+            Log out
+            </button>
+  
            
 
           <button
