@@ -171,7 +171,24 @@ export default function Home() {
 
     try {
       const { data: userData, error: userErr } = await supabase.auth.getUser();
-      if (userErr) throw new Error(userErr.message);
+
+      if (userErr) {
+        const msg = userErr.message || "";
+        // Self-heal for the common paused/unpaused JWT mismatch
+        if (msg.toLowerCase().includes("sub claim in jwt does not exist")) {
+          await supabase.auth.signOut();
+          const { error: anonErr } = await supabase.auth.signInAnonymously();
+          if (anonErr) throw new Error("Re-auth failed: " + anonErr.message);
+
+          // try again
+          const retry = await supabase.auth.getUser();
+          if (retry.error) throw new Error("User fetch failed after re-auth: " + retry.error.message);
+          if (!retry.data.user?.id) throw new Error("No user id after re-auth.");
+          // continue using retry.data.user.id
+        } else {
+          throw new Error(userErr.message);
+        }
+      }
 
       const userId = userData.user?.id;
       if (!userId) throw new Error("No user id found. Refresh and try again.");
