@@ -56,7 +56,7 @@ export async function GET(req: Request) {
 
     // Optional filters (we’ll add UI controls later)
     const classCode = url.searchParams.get("class_code") || null;
-    const limit = Math.min(Number(url.searchParams.get("limit") || "2000"), 5000);
+    const limit = Math.min(Number(url.searchParams.get("limit") || "10000"), 20000);
     const completedOnly = url.searchParams.get("completed") === "1";
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -78,7 +78,7 @@ export async function GET(req: Request) {
       .select(
         "id, created_at, class_code, participant_label, game_id, round_num, strategy, student_move, agent_move, student_payoff, agent_payoff, chat"
       )
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .limit(limit);
 
     if (classCode) q = q.eq("class_code", classCode);
