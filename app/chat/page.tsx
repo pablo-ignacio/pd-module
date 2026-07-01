@@ -88,7 +88,9 @@ export default function Home() {
     if (savedStrategy === "ALWAYS_DEFECT" || savedStrategy === "ALWAYS_COOPERATE" || savedStrategy === "RANDOM_50_50") {
       setStrategy(savedStrategy);
     }
-    const savedClass = localStorage.getItem("pd_class_code");
+    // sessionStorage (set on /identify) takes priority over instructor localStorage override
+    const sessionClass = sessionStorage.getItem("pd_class_code");
+    const savedClass = sessionClass || localStorage.getItem("pd_class_code");
     if (savedClass) setClassCode(savedClass);
   }, []);
 

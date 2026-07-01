@@ -9,6 +9,7 @@ export default function IdentifyPage() {
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [supabasePaused, setSupabasePaused] = useState(false);
+  const [courseChecked, setCourseChecked] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -56,6 +57,11 @@ export default function IdentifyPage() {
       sessionStorage.setItem("pd_game_id", gameId);
       sessionStorage.setItem("pd_round", "1");
       sessionStorage.removeItem("pd_messages");
+      if (courseChecked) {
+        sessionStorage.setItem("pd_class_code", "NEG5055-S26");
+      } else {
+        sessionStorage.removeItem("pd_class_code");
+      }
 
       // 3) Continue the flow
       window.location.href = "/instructions";
@@ -97,6 +103,16 @@ export default function IdentifyPage() {
           style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ccc" }}
           disabled={loading}
         />
+
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#333", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={courseChecked}
+            onChange={(e) => setCourseChecked(e.target.checked)}
+            disabled={loading}
+          />
+          Negotiation 5055 Summer 2026
+        </label>
 
         <button
           onClick={start}
