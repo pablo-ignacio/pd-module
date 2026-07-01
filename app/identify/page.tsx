@@ -58,7 +58,7 @@ export default function IdentifyPage() {
       sessionStorage.setItem("pd_round", "1");
       sessionStorage.removeItem("pd_messages");
       if (courseChecked) {
-        sessionStorage.setItem("pd_class_code", "NEG5055-S26");
+        sessionStorage.setItem("pd_class_code", "MAN5505-S26");
       } else {
         sessionStorage.removeItem("pd_class_code");
       }
@@ -111,7 +111,7 @@ export default function IdentifyPage() {
             onChange={(e) => setCourseChecked(e.target.checked)}
             disabled={loading}
           />
-          Negotiation 5055 Summer 2026
+          Negotiations MAN5505 Summer 2026
         </label>
 
         <button

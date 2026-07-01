@@ -94,7 +94,7 @@ export default function DashboardPage() {
   const [err, setErr] = useState<string>("");
 
   // Optional simple filter (you can extend later)
-  const [classCode, setClassCode] = useState<string>("NEG5055-S26");
+  const [classCode, setClassCode] = useState<string>("MAN5505-S26");
 
   // Drilldown
   const [selected, setSelected] = useState<DashboardRow | null>(null);
