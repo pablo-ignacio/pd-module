@@ -259,18 +259,20 @@ async function refresh() {
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ fontSize: 12, color: "#666" }}>Class code (optional)</label>
-            <input
+            <label style={{ fontSize: 12, color: "#666" }}>Course filter</label>
+            <select
               value={classCode}
               onChange={(e) => setClassCode(e.target.value)}
-              placeholder="e.g., MBA-A1"
               style={{
-                width: 180,
+                width: 260,
                 padding: "8px 10px",
                 borderRadius: 10,
                 border: "1px solid #ccc",
               }}
-            />
+            >
+              <option value="">All courses</option>
+              <option value="MAN5505-S26">Negotiations MAN5505 Summer 2026</option>
+            </select>
           </div>
 
             <label

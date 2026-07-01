@@ -14,7 +14,7 @@ export default function Home() {
 
   const [isInstructor, setIsInstructor] = useState(false);
   const [strategy, setStrategy] = useState<Strategy>("ALWAYS_DEFECT");
-  const [classCode, setClassCode] = useState("MBA-A1");
+  const [classCode, setClassCode] = useState("");
 
   const [authReady, setAuthReady] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
