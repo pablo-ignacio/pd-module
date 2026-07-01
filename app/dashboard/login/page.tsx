@@ -1,11 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function DashboardLoginPage() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [supabasePaused, setSupabasePaused] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await supabase.auth.getSession();
+      } catch {
+        setSupabasePaused(true);
+      }
+    })();
+  }, []);
 
   async function onLogin() {
     setErr("");
@@ -33,6 +45,17 @@ export default function DashboardLoginPage() {
   return (
     <main style={{ maxWidth: 520, margin: "40px auto", padding: 16, fontFamily: "system-ui" }}>
       <h1 style={{ marginTop: 0 }}>Instructor Dashboard</h1>
+
+      {supabasePaused && (
+        <div style={{ padding: "10px 14px", borderRadius: 10, background: "#fff3cd", border: "1px solid #ffc107", color: "#856404", marginBottom: 14, fontSize: 14 }}>
+          <b>Supabase project is paused.</b> Go to{" "}
+          <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" style={{ color: "#856404" }}>
+            supabase.com/dashboard
+          </a>{" "}
+          and resume it, then reload this page.
+        </div>
+      )}
+
       <p style={{ color: "#555" }}>Enter the dashboard password.</p>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>

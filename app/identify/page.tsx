@@ -1,12 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function IdentifyPage() {
   const [label, setLabel] = useState("");
   const [classPass, setClassPass] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [supabasePaused, setSupabasePaused] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await supabase.auth.getSession();
+      } catch {
+        setSupabasePaused(true);
+      }
+    })();
+  }, []);
 
   async function start() {
     setErr("");
@@ -57,6 +69,13 @@ export default function IdentifyPage() {
   return (
     <main style={{ maxWidth: 720, margin: "30px auto", padding: 16, fontFamily: "system-ui" }}>
       <h1>Your ID</h1>
+
+      {supabasePaused && (
+        <div style={{ padding: "10px 14px", borderRadius: 10, background: "#fff3cd", border: "1px solid #ffc107", color: "#856404", marginBottom: 14, fontSize: 14 }}>
+          <b>Service is temporarily unavailable.</b> Please contact your instructor.
+        </div>
+      )}
+
       <p style={{ color: "#555" }}>
         Enter any identifier you want (nickname, code, number). It does not need to be your real name.
       </p>
